@@ -1,6 +1,6 @@
 # Flappy Bird OpenGL - Primer Parcial
 
-Este proyecto es una implementación limpia y modular de Flappy Bird utilizando Java, LWJGL y OpenGL 3.3 Core Profile.
+Este proyecto es una implementación limpia y modular de Flappy Bird utilizando Java, LWJGL y OpenGL 3.3 Core Profile. Es un proyecto de práctica usando herramientas de OpenGL.
 
 ## Integrantes
 - [Tu Nombre Aquí]
@@ -20,5 +20,5 @@ Este proyecto es una implementación limpia y modular de Flappy Bird utilizando 
 Para compilar y ejecutar el proyecto, asegúrate de tener Maven instalado y ejecuta:
 
 ```bash
-mvn compile exec:exec
+mvn compile exec:java
 ```
