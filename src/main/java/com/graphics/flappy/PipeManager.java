@@ -36,8 +36,8 @@ public class PipeManager {
             if (b.score > maxScore)
                 maxScore = b.score;
 
-        // Dificultad: aumenta velocidad y frecuencia cada 5 puntos
-        currentSpeed = baseSpeed + (maxScore / 5) * 0.15f;
+        // Dificultad: aumenta velocidad y frecuencia cada 5 puntos (cap maximo jugable)
+        currentSpeed = Math.min(1.8f, baseSpeed + (maxScore / 5) * 0.15f);
         currentInterval = Math.max(0.8f, baseInterval - (maxScore / 5) * 0.1f);
 
         timer += dt;
@@ -58,11 +58,11 @@ public class PipeManager {
                 if (p.x + width / 2 < b.x) {
                     if (i == 0 && !p.p1Passed) {
                         p.p1Passed = true;
-                        b.score++;
+                        if (b.alive) b.score++;
                     }
                     if (i == 1 && !p.p2Passed) {
                         p.p2Passed = true;
-                        b.score++;
+                        if (b.alive) b.score++;
                     }
                 }
             }
@@ -83,26 +83,73 @@ public class PipeManager {
         pipes.add(new Pipe(1.2f, -0.4f + rand.nextFloat() * 0.8f));
     }
 
-    public void render(int uOff, int uSca, int uCol) {
+    public void render(int uOff, int uSca, int uCol, int uTilt) {
         for (Pipe p : pipes) {
             float tH = 1.0f - (p.gapY + gapHeight / 2);
-            draw(uOff, uSca, uCol, p.x, (p.gapY + gapHeight / 2) + tH / 2, width, tH);
+            float tY = (p.gapY + gapHeight / 2) + tH / 2;
+            drawPipe(uOff, uSca, uCol, uTilt, p.x, tY, width, tH, true);
+            
             float bH = (p.gapY - gapHeight / 2) - (-1.0f);
-            draw(uOff, uSca, uCol, p.x, -1.0f + bH / 2, width, bH);
+            float bY = -1.0f + bH / 2;
+            drawPipe(uOff, uSca, uCol, uTilt, p.x, bY, width, bH, false);
         }
     }
 
-    private void draw(int uOff, int uSca, int uCol, float x, float y, float w, float h) {
-        // Borde oscuro
-        GL20.glUniform2f(uOff, x, y);
-        GL20.glUniform2f(uSca, w + 0.015f, h);
-        GL20.glUniform3f(uCol, 0.15f, 0.1f, 0.1f);
+    private void drawPipe(int uOff, int uSca, int uCol, int uTilt, float x, float y, float w, float h, boolean isTopPipe) {
+        GL20.glUniform1f(uTilt, 0); // No tilt for pipes
+        
+        float capHeight = 0.08f;
+        float capWidth = w + 0.04f;
+        
+        float pipeTopY = y + h/2;
+        float pipeBotY = y - h/2;
+        
+        float shaftH = h - capHeight;
+        float shaftY;
+        float capY;
+        
+        if (isTopPipe) {
+            // Cap at the bottom
+            capY = pipeBotY + capHeight/2;
+            shaftY = pipeBotY + capHeight + shaftH/2;
+        } else {
+            // Cap at the top
+            capY = pipeTopY - capHeight/2;
+            shaftY = pipeTopY - capHeight - shaftH/2;
+        }
+        
+        // --- DRAW SHAFT ---
+        // Borde oscuro (Grosor extra en H también para borde superior/inferior)
+        GL20.glUniform2f(uOff, x, shaftY);
+        GL20.glUniform2f(uSca, w + 0.02f, shaftH + 0.02f);
+        GL20.glUniform3f(uCol, 0.0f, 0.0f, 0.0f); // Negro
         GL11.glDrawArrays(GL11.GL_TRIANGLES, 0, 6);
-
         // Cuerpo verde
-        GL20.glUniform2f(uOff, x, y);
-        GL20.glUniform2f(uSca, w, h);
-        GL20.glUniform3f(uCol, 0.3f, 0.8f, 0.3f);
+        GL20.glUniform2f(uOff, x, shaftY);
+        GL20.glUniform2f(uSca, w, shaftH);
+        GL20.glUniform3f(uCol, 0.45f, 0.75f, 0.25f);
+        GL11.glDrawArrays(GL11.GL_TRIANGLES, 0, 6);
+        // Brillo izquierdo
+        GL20.glUniform2f(uOff, x - w/3, shaftY);
+        GL20.glUniform2f(uSca, w/4, shaftH);
+        GL20.glUniform3f(uCol, 0.6f, 0.9f, 0.4f);
+        GL11.glDrawArrays(GL11.GL_TRIANGLES, 0, 6);
+        
+        // --- DRAW CAP ---
+        // Borde oscuro (Grosor extra en H también)
+        GL20.glUniform2f(uOff, x, capY);
+        GL20.glUniform2f(uSca, capWidth + 0.02f, capHeight + 0.02f);
+        GL20.glUniform3f(uCol, 0.0f, 0.0f, 0.0f); // Negro
+        GL11.glDrawArrays(GL11.GL_TRIANGLES, 0, 6);
+        // Cuerpo verde
+        GL20.glUniform2f(uOff, x, capY);
+        GL20.glUniform2f(uSca, capWidth, capHeight);
+        GL20.glUniform3f(uCol, 0.45f, 0.75f, 0.25f);
+        GL11.glDrawArrays(GL11.GL_TRIANGLES, 0, 6);
+        // Brillo izquierdo
+        GL20.glUniform2f(uOff, x - capWidth/3, capY);
+        GL20.glUniform2f(uSca, capWidth/4, capHeight);
+        GL20.glUniform3f(uCol, 0.6f, 0.9f, 0.4f);
         GL11.glDrawArrays(GL11.GL_TRIANGLES, 0, 6);
     }
 
