@@ -18,12 +18,15 @@ public class SoundEngine {
 
     private int srcJump1;
     private int srcJump2;
+    private int srcJump3;
     private int srcScore;
     private int srcDie1;
     private int srcDie2;
+    private int srcDie3;
     private int srcSelect;
     private int srcConfirm;
     private int srcLevelUp;
+    private int srcWin;
 
     public void init() {
         device = ALC10.alcOpenDevice((ByteBuffer) null);
@@ -36,25 +39,35 @@ public class SoundEngine {
         srcJump1 = createSource(generateChirp(300, 700, 0.12f));
         // Salto P2: tono un poco más alto (personalidad distinta)
         srcJump2 = createSource(generateChirp(400, 900, 0.10f));
+        // Salto P3: tono grave y profundo (personalidad terrenal)
+        srcJump3 = createSource(generateChirp(180, 420, 0.14f));
         // Score: fanfare de 3 pulsos rápidos ascendentes tipo moneda de Mario
         srcScore = createSource(generateCoinSound());
         // Muerte P1: glissando descendente oscuro
         srcDie1  = createSource(generateDeath(580, 60, 0.45f, 0.9f));
         srcDie2  = createSource(generateDeath(480, 50, 0.50f, 0.85f));
+        // Muerte P3: glissando más grave y lento
+        srcDie3  = createSource(generateDeath(380, 40, 0.55f, 0.8f));
         srcSelect  = createSource(generateClick(320, 0.06f));
         srcConfirm = createSource(generateConfirmChord());
         srcLevelUp = createSource(generateLevelUpFanfare());
+        srcWin     = createSource(generateWinSound());
     }
 
     public void playJump(int birdIndex) {
-        play(birdIndex == 0 ? srcJump1 : srcJump2);
+        if (birdIndex == 0)      play(srcJump1);
+        else if (birdIndex == 1) play(srcJump2);
+        else                     play(srcJump3);
     }
 
     public void playScore()   { play(srcScore); }
     public void playLevelUp() { play(srcLevelUp); }
+    public void playWin()     { play(srcWin); }
 
     public void playDie(int birdIndex) {
-        play(birdIndex == 0 ? srcDie1 : srcDie2);
+        if (birdIndex == 0)      play(srcDie1);
+        else if (birdIndex == 1) play(srcDie2);
+        else                     play(srcDie3);
     }
 
     public void playSelect()  { play(srcSelect); }
@@ -94,6 +107,36 @@ public class SoundEngine {
                 double si2 = Math.sin(2 * Math.PI * freq * 2 * (offset + i) / sampleRate) * 0.3;
                 double val = (sq * 0.35 + si * 0.50 + si2) * env;
                 short sample = (short)(val * Short.MAX_VALUE * 0.65);
+                buf.put((byte)(sample & 0xFF));
+                buf.put((byte)((sample >> 8) & 0xFF));
+            }
+        }
+        buf.flip();
+        return makeBuffer(buf, sampleRate);
+    }
+
+    /**
+     * Fanfarria de Victoria epica: C5 -> E5 -> G5 -> C6 -> E6 -> G6 (Arpegio largo)
+     */
+    private int generateWinSound() {
+        int sampleRate = 44100;
+        float[] noteFreqs = {523f, 659f, 784f, 1047f, 1318f, 1568f}; // Do, Mi, Sol, Do, Mi, Sol
+        float noteDur = 0.12f;
+        int noteSamples = (int)(sampleRate * noteDur);
+        int total = noteSamples * noteFreqs.length;
+        ByteBuffer buf = BufferUtils.createByteBuffer(total * 2);
+
+        for (int n = 0; n < noteFreqs.length; n++) {
+            float freq = noteFreqs[n];
+            int offset = n * noteSamples;
+            for (int i = 0; i < noteSamples; i++) {
+                double progress = (double) i / noteSamples;
+                double env = Math.exp(-progress * 2); 
+                double val = Math.sin(2 * Math.PI * freq * (offset + i) / sampleRate) * 0.5;
+                // Añadir un poco de onda cuadrada para que suene retro
+                val += (Math.sin(2 * Math.PI * freq * (offset + i) / sampleRate) >= 0 ? 0.2 : -0.2);
+                val *= env;
+                short sample = (short)(val * Short.MAX_VALUE * 0.6);
                 buf.put((byte)(sample & 0xFF));
                 buf.put((byte)((sample >> 8) & 0xFF));
             }
@@ -248,12 +291,15 @@ public class SoundEngine {
     public void cleanup() {
         AL10.alDeleteSources(srcJump1);
         AL10.alDeleteSources(srcJump2);
+        AL10.alDeleteSources(srcJump3);
         AL10.alDeleteSources(srcScore);
         AL10.alDeleteSources(srcDie1);
         AL10.alDeleteSources(srcDie2);
+        AL10.alDeleteSources(srcDie3);
         AL10.alDeleteSources(srcSelect);
         AL10.alDeleteSources(srcConfirm);
         AL10.alDeleteSources(srcLevelUp);
+        AL10.alDeleteSources(srcWin);
         ALC10.alcDestroyContext(context);
         ALC10.alcCloseDevice(device);
     }

@@ -10,7 +10,7 @@ import org.lwjgl.opengl.GL20;
 public class PipeManager {
     public static class Pipe {
         float x, gapY;
-        boolean p1Passed = false, p2Passed = false;
+        boolean p1Passed = false, p2Passed = false, p3Passed = false;
 
         Pipe(float x, float gapY) {
             this.x = x;
@@ -62,6 +62,10 @@ public class PipeManager {
                     }
                     if (i == 1 && !p.p2Passed) {
                         p.p2Passed = true;
+                        if (b.alive) b.score++;
+                    }
+                    if (i == 2 && !p.p3Passed) {
+                        p.p3Passed = true;
                         if (b.alive) b.score++;
                     }
                 }

@@ -13,7 +13,7 @@ import org.lwjgl.opengl.GL30;
 
 public class FlappyGame {
     private enum State {
-        START, PLAYING, GAMEOVER
+        START, PLAYING, GAMEOVER, WINNING, VICTORY
     }
 
     private State state = State.START;
@@ -26,11 +26,13 @@ public class FlappyGame {
     // Control de teclas
     private boolean spacePressed = false;
     private boolean wPressed = false;
+    private boolean kp5Pressed = false;
     private boolean upPressed = false;
     private boolean downPressed = false;
     private boolean enterPressed = false;
     private int menuSelection = 1;
     private int gameOverSelection = 1;
+    private int winnerIndex = -1; // índice del pájaro que ganó
 
     // Fuente de píxeles para números 0-9 y algunas letras
     private final int[][][] FONT = {
@@ -62,7 +64,8 @@ public class FlappyGame {
         {{1,0,1},{1,1,1},{1,0,1},{1,0,1},{1,0,1}}, // 25: M
         {{1,0,1},{1,0,1},{1,0,1},{1,0,1},{0,1,0}}, // 26: V
         {{1,1,1},{1,0,1},{1,0,1},{1,0,1},{1,0,1}}, // 27: N
-        {{0,1,1},{1,0,0},{1,0,0},{1,0,0},{0,1,1}}  // 28: C
+        {{0,1,1},{1,0,0},{1,0,0},{1,0,0},{0,1,1}}, // 28: C
+        {{1,1,1},{0,1,0},{0,1,0},{0,1,0},{0,1,0}}  // 29: T
     };
 
     private final List<Bird> birds = new ArrayList<>();
@@ -89,7 +92,7 @@ public class FlappyGame {
     private void init() {
         if (!GLFW.glfwInit())
             throw new IllegalStateException("GLFW Fail");
-        window = GLFW.glfwCreateWindow(900, 700, "Flappy Bird Parcial - 2 Players", 0, 0);
+        window = GLFW.glfwCreateWindow(900, 700, "Flappy Bird Parcial - 3 Players", 0, 0);
         GLFW.glfwMakeContextCurrent(window);
         GLFW.glfwSwapInterval(1);
         GL.createCapabilities();
@@ -138,9 +141,12 @@ public class FlappyGame {
 
     private void startGame(int numPlayers) {
         birds.clear();
-        birds.add(new Bird(-0.5f, 0, 0.97f, 0.71f, 0.0f)); // P1
-        if (numPlayers == 2) {
-            birds.add(new Bird(-0.3f, 0, 0.1f, 0.8f, 0.95f)); // P2
+        birds.add(new Bird(-0.5f, 0, 0.97f, 0.71f, 0.0f));   // P1 - Amarillo
+        if (numPlayers >= 2) {
+            birds.add(new Bird(-0.3f, 0, 0.1f, 0.8f, 0.95f)); // P2 - Cyan
+        }
+        if (numPlayers >= 3) {
+            birds.add(new Bird(-0.1f, 0, 0.2f, 0.9f, 0.2f));  // P3 - Verde
         }
         pipeManager.reset();
         state = State.PLAYING;
@@ -197,22 +203,51 @@ public class FlappyGame {
                 int newLevel = pipeManager.getLevel(birds);
                 if (newLevel > prevLevel) sound.playLevelUp();
 
-                if (!anyAlive)
+                // --- DETECCION DE VICTORIA (nivel 3 = score >= 10) ---
+                for (int i = 0; i < birds.size(); i++) {
+                    Bird b = birds.get(i);
+                    if (b.alive && b.score >= 5 && !b.winner) {
+                        b.winner = true;
+                        winnerIndex = i;
+                        state = State.WINNING; // primero animar vuelo, luego VICTORY
+                        sound.playWin();
+                        break;
+                    }
+                }
+
+                if (!anyAlive && state == State.PLAYING)
                     state = State.GAMEOVER;
+            }
+
+            // --- ESTADO WINNING: animar vuelo hasta que salga de pantalla ---
+            if (state == State.WINNING) {
+                // Solo actualizamos los pajaros (tuberias congeladas)
+                for (int i = 0; i < birds.size(); i++) {
+                    birds.get(i).update(dt, -1.8f);
+                }
+                // Cuando el ganador sale por arriba -> mostrar GANASTE
+                if (winnerIndex >= 0 && birds.get(winnerIndex).y > 1.25f) {
+                    state = State.VICTORY;
+                }
             }
 
             render();
 
             int level = pipeManager.getLevel(birds);
-            String t = "Flappy 2P";
+            String t = "Flappy 3P";
             if (birds.size() > 0) {
                 t += " | NIVEL " + level + " | P1: " + birds.get(0).score;
                 if (birds.size() > 1) t += " | P2: " + birds.get(1).score;
+                if (birds.size() > 2) t += " | P3: " + birds.get(2).score;
             }
             if (state == State.START)
                 t = "MENU PRINCIPAL";
             else if (state == State.GAMEOVER)
                 t = "GAME OVER";
+            else if (state == State.WINNING)
+                t = "Flappy 3P - VOLANDO!";
+            else if (state == State.VICTORY)
+                t = "GANASTE! " + (winnerIndex == 0 ? "P1" : winnerIndex == 1 ? "P2" : "P3") + " GANO";
             GLFW.glfwSetWindowTitle(window, t);
 
             GLFW.glfwSwapBuffers(window);
@@ -254,14 +289,18 @@ public class FlappyGame {
             GL30.glBindVertexArray(vao);
             drawText("FLAPPY BIRD", 0.0f, 0.5f, 0.04f, 1.0f, 0.8f, 0.0f); // Título amarillo
             
-            drawText("1 JUGADOR", 0.0f, 0.0f, 0.025f, 0.97f, 0.71f, 0.0f); // Opcion 1P
-            drawText("2 JUGADORES", 0.0f, -0.2f, 0.025f, 0.1f, 0.8f, 0.95f); // Opcion 2P
+            drawText("1 JUGADOR",  0.0f,  0.1f,  0.025f, 0.97f, 0.71f, 0.0f);  // Opcion 1P - Amarillo
+            drawText("2 JUGADORES", 0.0f, -0.1f, 0.025f, 0.1f,  0.8f,  0.95f); // Opcion 2P - Cyan
+            drawText("3 JUGADORES", 0.0f, -0.3f, 0.025f, 0.2f,  0.9f,  0.2f);  // Opcion 3P - Verde
 
             // Dibujar cursor como triángulo
             GL30.glBindVertexArray(vaoTri);
-            float cursorY = menuSelection == 1 ? (0.0f - 0.06f) : (-0.2f - 0.06f);
+            float cursorY;
+            if      (menuSelection == 1) cursorY =  0.1f - 0.06f;
+            else if (menuSelection == 2) cursorY = -0.1f - 0.06f;
+            else                         cursorY = -0.3f - 0.06f;
             GL20.glUniform1f(uTilt, 0);
-            GL20.glUniform2f(uOff, -0.6f, cursorY);
+            GL20.glUniform2f(uOff, -0.7f, cursorY);
             GL20.glUniform2f(uSca, 0.06f, 0.06f);
             GL20.glUniform3f(uCol, 1.0f, 1.0f, 1.0f); // Blanco
             GL11.glDrawArrays(GL11.GL_TRIANGLES, 0, 3);
@@ -272,13 +311,17 @@ public class FlappyGame {
 
             // DIBUJAR UI (Marcadores y Nivel)
             GL30.glBindVertexArray(vao);
-            drawText(String.valueOf(pipeManager.getLevel(birds)), 0.0f, 0.8f, 0.025f, 1.0f, 1.0f, 1.0f);
-            
+            // Nivel: centrado, color negro para máximo contraste sin bordes
+            drawText("NIVEL " + pipeManager.getLevel(birds), 0.0f, 0.68f, 0.022f, 0.0f, 0.0f, 0.0f);
+
             if(birds.size() > 0)
-                drawText(String.valueOf(birds.get(0).score), -0.6f, 0.8f, 0.025f, 0.97f, 0.71f, 0.0f);
-                
+                drawText("P1:" + birds.get(0).score, -0.7f, 0.85f, 0.022f, 0.97f, 0.71f, 0.0f);
+
             if(birds.size() > 1)
-                drawText(String.valueOf(birds.get(1).score), 0.6f, 0.8f, 0.025f, 0.1f, 0.8f, 0.95f);
+                drawText("P2:" + birds.get(1).score, 0.0f, 0.85f, 0.022f, 0.1f, 0.8f, 0.95f);
+
+            if(birds.size() > 2)
+                drawText("P3:" + birds.get(2).score, 0.7f, 0.85f, 0.022f, 0.2f, 0.9f, 0.2f);
 
             if (state == State.GAMEOVER) {
                 // Menú Game Over
@@ -295,6 +338,34 @@ public class FlappyGame {
                 GL20.glUniform2f(uOff, -0.55f, cursorY);
                 GL20.glUniform2f(uSca, 0.06f, 0.06f);
                 GL20.glUniform3f(uCol, 1.0f, 0.2f, 0.2f); // Triángulo rojo
+                GL11.glDrawArrays(GL11.GL_TRIANGLES, 0, 3);
+            }
+
+            if (state == State.VICTORY) {
+                // Panel semitransparente de fondo (oscuro)
+                GL30.glBindVertexArray(vao);
+                drawRect(0.0f, 0.15f, 1.6f, 1.4f, 0.0f, 0.0f, 0.15f); // fondo azul oscuro
+
+                // Texto GANASTE en dorado grande
+                drawText("GANASTE", 0.04f, 0.6f, 0.055f, 1.0f, 0.85f, 0.0f);
+
+                // Quién ganó (con su color de pájaro)
+                String winnerLabel = winnerIndex == 0 ? "P1 GANO" : winnerIndex == 1 ? "P2 GANO" : "P3 GANO";
+                float[] wc = winnerIndex == 0 ? new float[]{0.97f, 0.71f, 0.0f}
+                           : winnerIndex == 1 ? new float[]{0.1f,  0.8f,  0.95f}
+                           :                   new float[]{0.2f,  0.9f,  0.2f};
+                drawText(winnerLabel, 0.0f, 0.2f, 0.03f, wc[0], wc[1], wc[2]);
+
+                drawText("REINICIAR", 0.02f, -0.05f, 0.025f, 1.0f, 1.0f, 1.0f);
+                drawText("MENU",      0.0f, -0.25f, 0.025f, 1.0f, 1.0f, 1.0f);
+
+                // Cursor victoria (dorado)
+                GL30.glBindVertexArray(vaoTri);
+                float cursorVY = gameOverSelection == 1 ? (-0.05f - 0.06f) : (-0.25f - 0.06f);
+                GL20.glUniform1f(uTilt, 0);
+                GL20.glUniform2f(uOff, -0.6f, cursorVY);
+                GL20.glUniform2f(uSca, 0.06f, 0.06f);
+                GL20.glUniform3f(uCol, 1.0f, 0.85f, 0.0f); // Triángulo dorado
                 GL11.glDrawArrays(GL11.GL_TRIANGLES, 0, 3);
             }
         }
@@ -329,6 +400,7 @@ public class FlappyGame {
             else if (c == 'V') idx = 26;
             else if (c == 'N') idx = 27;
             else if (c == 'C') idx = 28;
+            else if (c == 'T') idx = 29;
             
             if (idx >= 0) {
                 int[][] matrix = FONT[idx];
@@ -387,20 +459,22 @@ public class FlappyGame {
         boolean isEnter = GLFW.glfwGetKey(window, GLFW.GLFW_KEY_ENTER) == GLFW.GLFW_PRESS;
 
         if (state == State.START) {
-            if (isUp && !upPressed) { menuSelection = 1; sound.playSelect(); }
-            if (isDown && !downPressed) { menuSelection = 2; sound.playSelect(); }
+            if (isUp && !upPressed)   { menuSelection = Math.max(1, menuSelection - 1); sound.playSelect(); }
+            if (isDown && !downPressed) { menuSelection = Math.min(3, menuSelection + 1); sound.playSelect(); }
             if (isEnter && !enterPressed) {
                 sound.playConfirm();
                 startGame(menuSelection);
             }
-        } else if (state == State.GAMEOVER) {
-            if (isUp && !upPressed) { gameOverSelection = 1; sound.playSelect(); }
+        } else if (state == State.GAMEOVER || state == State.VICTORY) {
+            if (isUp && !upPressed)   { gameOverSelection = 1; sound.playSelect(); }
             if (isDown && !downPressed) { gameOverSelection = 2; sound.playSelect(); }
             if (isEnter && !enterPressed) {
                 sound.playConfirm();
                 if (gameOverSelection == 1) {
+                    winnerIndex = -1;
                     startGame(birds.size()); // Reiniciar partida actual
                 } else {
+                    winnerIndex = -1;
                     reset(); // Ir al menu principal
                 }
             }
@@ -420,12 +494,23 @@ public class FlappyGame {
                 }
             }
             wPressed = isWDown || isUp;
+
+            // P3: Tecla 5 del teclado numérico
+            boolean isKp5 = GLFW.glfwGetKey(window, GLFW.GLFW_KEY_KP_5) == GLFW.GLFW_PRESS;
+            if (isKp5 && !kp5Pressed) {
+                if (state == State.PLAYING && birds.size() > 2) {
+                    birds.get(2).jump(0.8f);
+                    sound.playJump(2);
+                }
+            }
+            kp5Pressed = isKp5;
         }
 
         upPressed = isUp;
         downPressed = isDown;
         spacePressed = isSpace;
         enterPressed = isEnter;
+        // kp5Pressed se actualiza dentro del bloque PLAYING
 
         if (GLFW.glfwGetKey(window, GLFW.GLFW_KEY_ESCAPE) == GLFW.GLFW_PRESS) {
             GLFW.glfwSetWindowShouldClose(window, true);

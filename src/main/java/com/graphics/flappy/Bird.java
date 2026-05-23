@@ -8,6 +8,7 @@ public class Bird {
     public float x, y;
     public float velY;
     public boolean alive = true;
+    public boolean winner = false; // true cuando gana: vuela hacia arriba
     public int score = 0;
     
     private final float width = 0.12f;
@@ -31,6 +32,13 @@ public class Bird {
     }
 
     public void update(float dt, float gravity) {
+        if (winner) {
+            // Vuelo de victoria: sube a velocidad constante con aleteo continuo
+            velY = 1.1f;
+            y += velY * dt;
+            wingTimer = 0.3f; // aleteo perpetuo
+            return;
+        }
         // Siempre aplicamos gravedad para que caiga incluso muerto
         velY += gravity * dt;
         y += velY * dt;
@@ -42,8 +50,8 @@ public class Bird {
     }
 
     public void render(int uOff, int uSca, int uCol, int uTilt, int vaoQuad, int vaoTri) {
-        // Si cae por debajo de la pantalla visible, no lo dibujamos (desaparece)
-        if (y < -1.2f) return;
+        // Si cae por debajo de la pantalla visible, no lo dibujamos
+        if (!winner && y < -1.2f) return;
 
         float pxS = 0.012f; 
         
@@ -114,7 +122,7 @@ public class Bird {
     }
 
     public boolean collidesWith(float px, float py, float pw, float ph) {
-        if (!alive) return false;
+        if (!alive || winner) return false; // ganador no colisiona
         float bL = x - width/2, bR = x + width/2, bT = y + height/2, bB = y - height/2;
         float pL = px - pw/2, pR = px + pw/2;
         if (bR > pL && bL < pR) {
